@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import compression from 'compression';
 import session from 'express-session';
 import { PrismaClient } from '@prisma/client';
 
@@ -17,10 +18,11 @@ const app = express();
 const prisma = new PrismaClient();
 
 const allowedOrigins = [
-  'http://localhost:3000', // URL du front-end local
-  'https://nikoguitar-848d8.web.app', // URL du front-end déployé
+  'http://localhost:3000',
+  'https://nikoguitar-848d8.web.app',
 ];
 
+// Middleware
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -33,14 +35,8 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true,
 }));
-
-// Répondre aux requêtes préliminaires (OPTIONS)
-app.options('*', cors());
-
-// Middleware pour parser les requêtes JSON
+app.use(compression()); // Ajoute la compression des réponses
 app.use(express.json());
-
-// Middleware pour les sessions
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your_secret_key',
   resave: false,
@@ -54,12 +50,8 @@ app.use(session({
 
 // Connexion à la base de données
 prisma.$connect()
-  .then(() => {
-    console.log('Base de données synchronisée');
-  })
-  .catch((err) => {
-    console.error('Erreur lors de la synchronisation de la base de données :', err);
-  });
+  .then(() => console.log('Base de données synchronisée'))
+  .catch((err) => console.error('Erreur lors de la synchronisation de la base de données :', err));
 
 // Routes
 app.use('/api/auth', authRoute);
@@ -67,14 +59,12 @@ app.use('/api/user', userRoute);
 app.use('/api/reservation', reservationRoute);
 app.use('/api/contact', contactRoute);
 app.use('/api/slots', slotsRoute);
-app.use('/api/admin', adminRoute); // Route pour les administrateurs
+app.use('/api/admin', adminRoute);
 
 // Vérification de la santé du serveur
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
+app.get('/health', (req, res) => res.json({ status: 'OK', timestamp: new Date().toISOString() }));
 
-// Middleware de gestion des erreurs
+// Middleware global de gestion des erreurs
 app.use((err, req, res, next) => {
   console.error('Erreur serveur :', err.message);
   res.status(500).json({ error: 'Une erreur est survenue sur le serveur.' });
@@ -89,6 +79,4 @@ process.on('SIGINT', async () => {
 
 // Démarrage du serveur
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Serveur démarré sur le port ${PORT}`);
-});
+app.listen(PORT, '0.0.0.0', () => console.log(`Serveur démarré sur le port ${PORT}`));

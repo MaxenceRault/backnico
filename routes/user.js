@@ -3,10 +3,67 @@ import { PrismaClient } from '@prisma/client';
 import verify from './verifyToken.js';
 import multer from 'multer';
 import bcrypt from 'bcrypt';
+import Joi from 'joi';
 
 const router = express.Router();
 const prisma = new PrismaClient();
-const upload = multer(); // Pas besoin de stockage sur disque, on travaille avec des données en mémoire
+const upload = multer();
+
+// Schéma de validation des mises à jour
+const updateSchema = Joi.object({
+  nom: Joi.string().min(2).max(50).optional(),
+  email: Joi.string().email().optional(),
+  motDePasse: Joi.string().min(6).optional(),
+});
+
+// Route combinée pour le tableau de bord
+router.get('/dashboard', verify, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        nom: true,
+        email: true,
+        photo: true,
+        role: true,
+      },
+    });
+
+    if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé.' });
+
+    const reservations = await prisma.reservation.findMany({
+      where: { userId: req.user.id },
+      include: { slot: true },
+    });
+
+    let adminData = {};
+    if (user.role === 'ADMIN') {
+      const users = await prisma.user.findMany({
+        select: {
+          id: true,
+          nom: true,
+          email: true,
+          role: true,
+        },
+      });
+
+      const allReservations = await prisma.reservation.findMany({
+        include: {
+          user: { select: { nom: true, email: true } },
+          slot: true,
+        },
+      });
+
+      adminData = { users, allReservations };
+    }
+
+    res.json({ user, reservations, adminData });
+  } catch (err) {
+    console.error('Erreur lors de la récupération du tableau de bord :', err);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
 
 // Obtenir le profil utilisateur
 router.get('/profile', verify, async (req, res) => {
@@ -15,16 +72,10 @@ router.get('/profile', verify, async (req, res) => {
       where: { id: req.user.id },
     });
 
-    if (!user) {
-      return res.status(404).json({ error: 'Utilisateur non trouvé' });
-    }
+    if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé.' });
 
-    // Convertir la photo en Base64 si elle existe
-    const photoBase64 = user.photo
-      ? `data:image/png;base64,${user.photo.toString('base64')}`
-      : null;
+    const photoBase64 = user.photo ? `data:image/png;base64,${user.photo.toString('base64')}` : null;
 
-    // Envoyer les informations utilisateur, y compris la photo
     res.json({
       id: user.id,
       nom: user.nom,
@@ -34,44 +85,39 @@ router.get('/profile', verify, async (req, res) => {
     });
   } catch (err) {
     console.error('Erreur lors de la récupération du profil :', err);
-    res.status(500).json({ error: 'Erreur lors de la récupération du profil' });
+    res.status(500).json({ error: 'Erreur lors de la récupération du profil.' });
   }
 });
 
 // Mettre à jour le profil utilisateur
 router.put('/profile', verify, upload.single('photo'), async (req, res) => {
   const { nom, email, motDePasse } = req.body;
-  const photo = req.file ? req.file.buffer : undefined; // Lecture des données en binaire
+  const photo = req.file ? req.file.buffer : undefined;
+
+  // Validation des données
+  const { error } = updateSchema.validate({ nom, email, motDePasse });
+  if (error) return res.status(400).json({ error: error.details[0].message });
 
   try {
-    // Construire l'objet `data` avec les champs fournis
     const data = {};
     if (nom) data.nom = nom;
     if (email) data.email = email;
     if (photo) data.photo = photo;
 
     if (motDePasse) {
-      // Hash le mot de passe si un nouveau mot de passe est fourni
       const salt = await bcrypt.genSalt(10);
       data.motDePasse = await bcrypt.hash(motDePasse, salt);
     }
 
-    // Mettre à jour l'utilisateur dans la base de données
     const updatedUser = await prisma.user.update({
       where: { id: req.user.id },
       data,
     });
 
-    // Retourner les informations mises à jour
-    res.json({
-      id: updatedUser.id,
-      nom: updatedUser.nom,
-      email: updatedUser.email,
-      role: updatedUser.role,
-    });
+    res.json(updatedUser);
   } catch (err) {
     console.error('Erreur lors de la mise à jour du profil :', err);
-    res.status(400).json({ error: 'Erreur lors de la mise à jour du profil' });
+    res.status(400).json({ error: 'Erreur lors de la mise à jour du profil.' });
   }
 });
 
