@@ -1,43 +1,52 @@
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider = "mysql" // Base de données MySQL
+  url      = env("DATABASE_URL") // URL de connexion depuis le fichier .env
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client-js" // Génère le client Prisma pour Node.js
 }
 
+// Modèle pour les utilisateurs
 model User {
-  id           Int           @id @default(autoincrement())
-  nom          String
-  email        String        @unique
-  motDePasse   String
-  photo        String?
-  reservations Reservation[]
-  slots        Slot[]        // Ajoutez ce champ pour établir la relation
+  id           Int           @id @default(autoincrement()) // ID unique auto-incrémenté
+  nom          String        // Nom de l'utilisateur
+  email        String        @unique // Email unique
+  motDePasse   String        // Mot de passe de l'utilisateur
+  photo        String?       // Photo de profil (facultatif)
+  reservations Reservation[] // Relation avec les réservations
+  slots        Slot[]        // Relation avec les créneaux réservés par l'utilisateur
 }
 
+// Modèle pour les réservations
 model Reservation {
-  id     Int    @id @default(autoincrement())
-  date   DateTime
-  heure  String
-  userId Int
-  user   User   @relation(fields: [userId], references: [id])
+  id     Int      @id @default(autoincrement()) // ID unique auto-incrémenté
+  date   DateTime // Date de la réservation
+  heure  String   // Heure de la réservation
+  slotId Int      // Référence à un créneau spécifique (Slot)
+  slot   Slot     @relation(fields: [slotId], references: [id]) // Relation avec le modèle Slot
+  userId Int      // Référence à l'utilisateur ayant fait la réservation
+  user   User     @relation(fields: [userId], references: [id]) // Relation avec le modèle User
 }
 
+// Modèle pour les contacts
 model Contact {
-  id        Int      @id @default(autoincrement())
-  nom       String
-  email     String
-  message   String
-  createdAt DateTime @default(now())
+  id        Int      @id @default(autoincrement()) // ID unique auto-incrémenté
+  nom       String   // Nom du contact
+  email     String   // Email du contact
+  message   String   // Message envoyé par le contact
+  createdAt DateTime @default(now()) // Date de création
 }
 
+// Modèle pour les créneaux (slots)
 model Slot {
-  id       Int      @id @default(autoincrement())
-  date     DateTime
-  heure    String
-  reserved Boolean  @default(false)
-  userId   Int?
-  user     User?    @relation(fields: [userId], references: [id])
+  id           Int           @id @default(autoincrement()) // ID unique auto-incrémenté
+  date         DateTime      // Date du créneau
+  heure        String        // Heure du créneau
+  reserved     Boolean       @default(false) // Indique si le créneau est réservé
+  userId       Int?          // Référence à l'utilisateur ayant réservé le créneau (facultatif)
+  user         User?         @relation(fields: [userId], references: [id]) // Relation avec le modèle User
+  reservations Reservation[] // Relation inverse avec les réservations
+
+  @@unique([date, heure]) // Empêche les doublons pour les créneaux
 }

@@ -7,8 +7,8 @@ import { PrismaClient } from '@prisma/client';
 import authRoute from './routes/auth.js';
 import reservationRoute from './routes/reservation.js';
 import contactRoute from './routes/contact.js';
-import userRoute from './routes/user.js'; 
-import slotsRoute from './routes/slots.js'; 
+import userRoute from './routes/user.js';
+import slotsRoute from './routes/slots.js';
 
 dotenv.config();
 
@@ -17,9 +17,9 @@ const prisma = new PrismaClient();
 
 // Middleware CORS avec configuration explicite
 app.use(cors({
-  origin: 'https://nikoguitar-848d8.web.app', // Autorise le front-end 
-  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Méthodes HTTP autorisées
-  credentials: true, // Autorise l'envoi de cookies ou d'en-têtes d'authentification
+  origin: 'http://localhost:3000', // URL du front-end
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true,
 }));
 
 // Répondre aux requêtes préliminaires (OPTIONS)
@@ -30,7 +30,7 @@ app.use(express.json());
 
 // Middleware pour les sessions
 app.use(session({
-  secret: 'your_secret_key',
+  secret: process.env.SESSION_SECRET || 'your_secret_key',
   resave: false,
   saveUninitialized: true,
 }));
@@ -46,10 +46,10 @@ prisma.$connect()
 
 // Routes
 app.use('/api/auth', authRoute);
-app.use('/api/user', userRoute); 
+app.use('/api/user', userRoute);
 app.use('/api/reservation', reservationRoute);
 app.use('/api/contact', contactRoute);
-app.use('/api/slots', slotsRoute); 
+app.use('/api/slots', slotsRoute);
 
 // Middleware de gestion des erreurs
 app.use((err, req, res, next) => {

@@ -1,72 +1,88 @@
 import express from 'express';
-import { getAuthUrl, getTokens, setCredentials, getCalendarEvents, addCalendarEvent } from '../googleAuth.js';
+import { PrismaClient } from '@prisma/client';
 import verify from './verifyToken.js';
 
+const prisma = new PrismaClient();
 const router = express.Router();
 
-// Route pour obtenir l'URL d'authentification OAuth2
-router.get('/auth-url', (req, res) => {
-  const url = getAuthUrl();
-  res.json({ url });
-});
-
-// Route de redirection OAuth2 pour échanger le code contre des tokens
-router.get('/oauth2callback', async (req, res) => {
-  const { code } = req.query;
+// Récupérer les réservations de l'utilisateur connecté
+router.get('/user', verify, async (req, res) => {
   try {
-    const tokens = await getTokens(code);
-    // Stocke les tokens dans la session pour un accès ultérieur
-    req.session.tokens = tokens;
-    res.redirect('/reservation'); // Redirige vers la page de réservation
+    const reservations = await prisma.reservation.findMany({
+      where: { userId: req.user.id },
+      include: { slot: true }, // Inclure les informations du slot réservé
+    });
+    res.json(reservations);
   } catch (err) {
-    console.error('Erreur lors de l\'authentification :', err.message);
-    res.status(400).json({ error: 'Erreur lors de l\'authentification' });
+    console.error('Erreur lors de la récupération des réservations :', err.message);
+    res.status(500).json({ error: 'Erreur lors de la récupération des réservations.' });
   }
 });
 
-// Route pour récupérer les créneaux disponibles
-router.get('/available-slots', verify, async (req, res) => {
-  try {
-    const tokens = req.session.tokens;
-    if (!tokens) {
-      return res.status(401).json({ error: 'Non autorisé. Token manquant.' });
-    }
-    setCredentials(tokens); // Définit les tokens pour les requêtes Google
-    const events = await getCalendarEvents();
-    res.json(events);
-  } catch (err) {
-    console.error('Erreur lors de la récupération des créneaux disponibles :', err.message);
-    res.status(500).json({ error: 'Erreur lors de la récupération des créneaux disponibles' });
-  }
-});
-
-// Route pour effectuer une réservation
+// Réserver un créneau
 router.post('/reserve', verify, async (req, res) => {
-  const { date, heure, instrument } = req.body;
-  const tokens = req.session.tokens;
-  if (!tokens) {
-    return res.status(401).json({ error: 'Non autorisé. Token manquant.' });
-  }
-  setCredentials(tokens);
-
-  const event = {
-    summary: `Cours de ${instrument}`,
-    start: {
-      dateTime: new Date(date + 'T' + heure).toISOString(),
-      timeZone: 'Europe/Paris',
-    },
-    end: {
-      dateTime: new Date(new Date(date + 'T' + heure).getTime() + 60 * 60 * 1000).toISOString(), // 1 heure plus tard
-      timeZone: 'Europe/Paris',
-    },
-  };
+  const { slotId } = req.body;
 
   try {
-    await addCalendarEvent(event);
-    res.json({ message: 'Réservation effectuée avec succès' });
+    console.log(`Tentative de réservation pour le créneau ID : ${slotId}, utilisateur : ${req.user.id}`);
+
+    const slot = await prisma.slot.findUnique({ where: { id: slotId } });
+
+    if (!slot) {
+      return res.status(404).json({ error: 'Le créneau n\'existe pas.' });
+    }
+
+    if (slot.reserved) {
+      return res.status(400).json({ error: 'Ce créneau est déjà réservé.' });
+    }
+
+    // Créer la réservation
+    const reservation = await prisma.reservation.create({
+      data: {
+        date: slot.date,
+        heure: slot.heure,
+        userId: req.user.id,
+        slotId: slot.id,
+      },
+    });
+
+    // Mettre à jour le créneau pour le marquer comme réservé
+    await prisma.slot.update({
+      where: { id: slotId },
+      data: { reserved: true, userId: req.user.id },
+    });
+
+    res.json({ message: 'Réservation réussie', reservation });
   } catch (err) {
     console.error('Erreur lors de la réservation :', err.message);
-    res.status(500).json({ error: 'Erreur lors de la réservation' });
+    res.status(500).json({ error: 'Erreur lors de la réservation.' });
+  }
+});
+
+// Supprimer une réservation
+router.delete('/delete/:id', verify, async (req, res) => {
+  const reservationId = parseInt(req.params.id, 10);
+
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+    });
+
+    if (!reservation || reservation.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Accès refusé.' });
+    }
+
+    await prisma.reservation.delete({ where: { id: reservationId } });
+
+    await prisma.slot.update({
+      where: { id: reservation.slotId },
+      data: { reserved: false, userId: null },
+    });
+
+    res.json({ message: 'Réservation supprimée avec succès.' });
+  } catch (err) {
+    console.error('Erreur lors de la suppression de la réservation :', err.message);
+    res.status(500).json({ error: 'Erreur lors de la suppression de la réservation.' });
   }
 });
 
