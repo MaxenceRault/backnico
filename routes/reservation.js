@@ -10,7 +10,7 @@ router.get('/user', verify, async (req, res) => {
   try {
     const reservations = await prisma.reservation.findMany({
       where: { userId: req.user.id },
-      include: { slot: true }, // Inclure les informations du slot réservé
+      include: { slot: true },
     });
     res.json(reservations);
   } catch (err) {
@@ -19,13 +19,11 @@ router.get('/user', verify, async (req, res) => {
   }
 });
 
-// Réserver un créneau
+// Réserver un créneau avec le type de cours
 router.post('/reserve', verify, async (req, res) => {
-  const { slotId } = req.body;
+  const { slotId, course } = req.body;
 
   try {
-    console.log(`Tentative de réservation pour le créneau ID : ${slotId}, utilisateur : ${req.user.id}`);
-
     const slot = await prisma.slot.findUnique({ where: { id: slotId } });
 
     if (!slot) {
@@ -36,17 +34,20 @@ router.post('/reserve', verify, async (req, res) => {
       return res.status(400).json({ error: 'Ce créneau est déjà réservé.' });
     }
 
-    // Créer la réservation
+    if (!course) {
+      return res.status(400).json({ error: 'Le type de cours est requis.' });
+    }
+
     const reservation = await prisma.reservation.create({
       data: {
         date: slot.date,
         heure: slot.heure,
         userId: req.user.id,
         slotId: slot.id,
+        course,
       },
     });
 
-    // Mettre à jour le créneau pour le marquer comme réservé
     await prisma.slot.update({
       where: { id: slotId },
       data: { reserved: true, userId: req.user.id },

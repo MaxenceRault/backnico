@@ -34,6 +34,7 @@ model Reservation {
   slot   Slot     @relation(fields: [slotId], references: [id]) // Relation avec le modèle Slot
   userId Int      // Référence à l'utilisateur ayant fait la réservation
   user   User     @relation(fields: [userId], references: [id]) // Relation avec le modèle User
+  course String   // Type de cours (ex : "Piano", "Guitare", etc.)
 }
 
 // Modèle pour les contacts
