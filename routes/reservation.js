@@ -19,7 +19,7 @@ router.get('/user', verify, async (req, res) => {
   }
 });
 
-// Réserver un créneau avec le type de cours
+// Réserver un créneau
 router.post('/reserve', verify, async (req, res) => {
   const { slotId, course } = req.body;
 

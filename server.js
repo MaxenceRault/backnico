@@ -17,12 +17,11 @@ dotenv.config();
 const app = express();
 const prisma = new PrismaClient();
 
+// Middleware de CORS
 const allowedOrigins = [
   'http://localhost:3000',
   'https://nikoguitar-848d8.web.app',
 ];
-
-// Middleware
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -35,8 +34,14 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true,
 }));
-app.use(compression()); // Ajoute la compression des réponses
+
+// Compression des réponses
+app.use(compression());
+
+// Middleware pour JSON
 app.use(express.json());
+
+// Middleware pour sessions
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your_secret_key',
   resave: false,
@@ -48,10 +53,10 @@ app.use(session({
   },
 }));
 
-// Connexion à la base de données
+// Connexion à la base de données Prisma
 prisma.$connect()
-  .then(() => console.log('Base de données synchronisée'))
-  .catch((err) => console.error('Erreur lors de la synchronisation de la base de données :', err));
+  .then(() => console.log('Base de données connectée'))
+  .catch((err) => console.error('Erreur de connexion à la base de données:', err));
 
 // Routes
 app.use('/api/auth', authRoute);
@@ -70,13 +75,15 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Une erreur est survenue sur le serveur.' });
 });
 
-// Gestion des déconnexions Prisma
+// Gestion de la déconnexion Prisma lors de l'arrêt du serveur
 process.on('SIGINT', async () => {
   await prisma.$disconnect();
-  console.log('Prisma disconnected');
+  console.log('Déconnexion de Prisma réussie');
   process.exit(0);
 });
 
 // Démarrage du serveur
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => console.log(`Serveur démarré sur le port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Serveur démarré sur le port ${PORT}`);
+});
