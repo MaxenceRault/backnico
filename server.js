@@ -22,6 +22,12 @@ app.use(cors({
   credentials: true,
 }));
 
+app.use(cors({
+  origin: 'https://nikoguitar-848d8.web.app', // URL du front-end
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true,
+}));
+
 // Répondre aux requêtes préliminaires (OPTIONS)
 app.options('*', cors());
 
