@@ -1,37 +1,40 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Role } from '@prisma/client';
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Inscription
 router.post('/register', async (req, res) => {
   const { nom, email, motDePasse } = req.body;
 
-  // Validation des champs
   if (!nom || !email || !motDePasse) {
     return res.status(400).json({ error: 'Tous les champs sont requis' });
   }
 
   try {
-    // Vérification si l'utilisateur existe déjà
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ error: 'Cet utilisateur existe déjà' });
     }
 
-    // Hachage du mot de passe
     const hashedPassword = await bcrypt.hash(motDePasse, 10);
 
-    // Création de l'utilisateur dans la base de données
+    // Définir le rôle en fonction du nombre d'utilisateurs
+    const userCount = await prisma.user.count();
+    const role = userCount === 0 ? Role.ADMIN : Role.CLIENT;
+
     const user = await prisma.user.create({
-      data: { nom, email, motDePasse: hashedPassword },
+      data: { 
+        nom, 
+        email, 
+        motDePasse: hashedPassword, 
+        role, // Utilisation correcte de l'énumération
+      },
     });
 
-    // Génération du token JWT
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
     res.status(201).json({
       token,
@@ -42,7 +45,6 @@ router.post('/register', async (req, res) => {
     res.status(500).json({ error: 'Erreur lors de l\'inscription' });
   }
 });
-
 // Connexion
 router.post('/login', async (req, res) => {
   const { email, motDePasse } = req.body;

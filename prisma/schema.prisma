@@ -8,6 +8,12 @@ generator client {
 }
 
 // Modèle pour les utilisateurs
+enum Role {
+  USER
+  ADMIN
+}
+
+// Modèle pour les utilisateurs
 model User {
   id           Int           @id @default(autoincrement()) // ID unique auto-incrémenté
   nom          String        // Nom de l'utilisateur
@@ -16,6 +22,7 @@ model User {
   photo        String?       // Photo de profil (facultatif)
   reservations Reservation[] // Relation avec les réservations
   slots        Slot[]        // Relation avec les créneaux réservés par l'utilisateur
+  role         Role          @default(USER) // Rôle par défaut "USER"
 }
 
 // Modèle pour les réservations
