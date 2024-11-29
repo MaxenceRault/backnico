@@ -15,19 +15,23 @@ dotenv.config();
 const app = express();
 const prisma = new PrismaClient();
 
-// Middleware CORS avec configuration explicite
+const allowedOrigins = [
+  'http://localhost:3000', // URL du front-end local
+  'https://nikoguitar-848d8.web.app', // URL du front-end déployé
+];
+
 app.use(cors({
-  origin: 'http://localhost:3000', // URL du front-end
+  origin: (origin, callback) => {
+    // Si aucune origine (par exemple, requête serveur à serveur) ou origine autorisée
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true,
 }));
-
-app.use(cors({
-  origin: 'https://nikoguitar-848d8.web.app', // URL du front-end
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true,
-}));
-
 // Répondre aux requêtes préliminaires (OPTIONS)
 app.options('*', cors());
 
