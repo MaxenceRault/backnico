@@ -21,6 +21,7 @@ const prisma = new PrismaClient();
 const allowedOrigins = [
   'http://localhost:3000',
   'https://nikoguitar-848d8.web.app',
+  'https://react-frontend-production-4003.up.railway.app',
 ];
 app.use(cors({
   origin: (origin, callback) => {
