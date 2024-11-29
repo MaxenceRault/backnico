@@ -2,23 +2,11 @@ import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import verify from './verifyToken.js';
 import multer from 'multer';
-import path from 'path';
 import bcrypt from 'bcrypt';
 
 const router = express.Router();
 const prisma = new PrismaClient();
-
-// Configuration de multer pour le stockage des images de profil
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${req.user.id}${path.extname(file.originalname)}`);
-  },
-});
-
-const upload = multer({ storage });
+const upload = multer(); // Pas besoin de stockage sur disque, on travaille avec des données en mémoire
 
 // Obtenir le profil utilisateur
 router.get('/profile', verify, async (req, res) => {
@@ -26,12 +14,26 @@ router.get('/profile', verify, async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
     });
+
     if (!user) {
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
     }
-    res.json(user);
+
+    // Convertir la photo en Base64 si elle existe
+    const photoBase64 = user.photo
+      ? `data:image/png;base64,${user.photo.toString('base64')}`
+      : null;
+
+    // Envoyer les informations utilisateur, y compris la photo
+    res.json({
+      id: user.id,
+      nom: user.nom,
+      email: user.email,
+      role: user.role,
+      photo: photoBase64,
+    });
   } catch (err) {
-    console.error(err);
+    console.error('Erreur lors de la récupération du profil :', err);
     res.status(500).json({ error: 'Erreur lors de la récupération du profil' });
   }
 });
@@ -39,7 +41,7 @@ router.get('/profile', verify, async (req, res) => {
 // Mettre à jour le profil utilisateur
 router.put('/profile', verify, upload.single('photo'), async (req, res) => {
   const { nom, email, motDePasse } = req.body;
-  const photo = req.file ? `/uploads/${req.file.filename}` : undefined;
+  const photo = req.file ? req.file.buffer : undefined; // Lecture des données en binaire
 
   try {
     // Construire l'objet `data` avec les champs fournis
@@ -54,13 +56,21 @@ router.put('/profile', verify, upload.single('photo'), async (req, res) => {
       data.motDePasse = await bcrypt.hash(motDePasse, salt);
     }
 
+    // Mettre à jour l'utilisateur dans la base de données
     const updatedUser = await prisma.user.update({
       where: { id: req.user.id },
       data,
     });
-    res.json(updatedUser);
+
+    // Retourner les informations mises à jour
+    res.json({
+      id: updatedUser.id,
+      nom: updatedUser.nom,
+      email: updatedUser.email,
+      role: updatedUser.role,
+    });
   } catch (err) {
-    console.error(err);
+    console.error('Erreur lors de la mise à jour du profil :', err);
     res.status(400).json({ error: 'Erreur lors de la mise à jour du profil' });
   }
 });

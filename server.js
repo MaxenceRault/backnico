@@ -9,6 +9,7 @@ import reservationRoute from './routes/reservation.js';
 import contactRoute from './routes/contact.js';
 import userRoute from './routes/user.js';
 import slotsRoute from './routes/slots.js';
+import adminRoute from './routes/admin.js';
 
 dotenv.config();
 
@@ -22,16 +23,17 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Si aucune origine (par exemple, requête serveur à serveur) ou origine autorisée
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      console.error(`CORS Error: Origin ${origin} not allowed.`);
+      callback(new Error('CORS Error: Origin not allowed.'));
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true,
 }));
+
 // Répondre aux requêtes préliminaires (OPTIONS)
 app.options('*', cors());
 
@@ -43,6 +45,11 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'your_secret_key',
   resave: false,
   saveUninitialized: true,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000,
+  },
 }));
 
 // Connexion à la base de données
@@ -60,11 +67,24 @@ app.use('/api/user', userRoute);
 app.use('/api/reservation', reservationRoute);
 app.use('/api/contact', contactRoute);
 app.use('/api/slots', slotsRoute);
+app.use('/api/admin', adminRoute); // Route pour les administrateurs
+
+// Vérification de la santé du serveur
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
 
 // Middleware de gestion des erreurs
 app.use((err, req, res, next) => {
   console.error('Erreur serveur :', err.message);
   res.status(500).json({ error: 'Une erreur est survenue sur le serveur.' });
+});
+
+// Gestion des déconnexions Prisma
+process.on('SIGINT', async () => {
+  await prisma.$disconnect();
+  console.log('Prisma disconnected');
+  process.exit(0);
 });
 
 // Démarrage du serveur

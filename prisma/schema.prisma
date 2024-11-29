@@ -7,7 +7,7 @@ generator client {
   provider = "prisma-client-js" // Génère le client Prisma pour Node.js
 }
 
-// Modèle pour les utilisateurs
+// Énumération pour les rôles d'utilisateur
 enum Role {
   USER
   ADMIN
@@ -19,7 +19,7 @@ model User {
   nom          String        // Nom de l'utilisateur
   email        String        @unique // Email unique
   motDePasse   String        // Mot de passe de l'utilisateur
-  photo        String?       // Photo de profil (facultatif)
+  photo        Bytes?        // Photo de profil en binaire (facultatif)
   reservations Reservation[] // Relation avec les réservations
   slots        Slot[]        // Relation avec les créneaux réservés par l'utilisateur
   role         Role          @default(USER) // Rôle par défaut "USER"
