@@ -17,7 +17,7 @@ const prisma = new PrismaClient();
 
 // Middleware CORS avec configuration explicite
 app.use(cors({
-  origin: 'http://localhost:3000', // URL du front-end
+  origin: 'https://nikoguitar-848d8.web.app', // URL du front-end
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true,
 }));
