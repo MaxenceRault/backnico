@@ -107,12 +107,15 @@ router.delete('/cancel-day/:date', verify, async (req, res) => {
     // Rechercher toutes les réservations pour la date spécifiée
     const reservations = await prisma.reservation.findMany({
       where: { date: parsedDate },
-      include: { slot: true },
+      include: { user: true },
     });
+
+    if (reservations.length === 0) {
+      return res.status(404).json({ error: 'Aucune réservation trouvée pour cette date.' });
+    }
 
     // Supprimer les réservations
     const reservationIds = reservations.map((r) => r.id);
-
     if (reservationIds.length > 0) {
       await prisma.reservation.deleteMany({
         where: { id: { in: reservationIds } },
@@ -131,13 +134,24 @@ router.delete('/cancel-day/:date', verify, async (req, res) => {
       });
     }
 
+    // Ajouter des notifications pour les utilisateurs concernés
+    const notifications = reservations.map((reservation) => ({
+      userId: reservation.userId,
+      message: `Votre cours de ${reservation.course} prévu le ${reservation.date.toLocaleDateString()} à ${reservation.heure} a été annulé.`,
+    }));
+
+    if (notifications.length > 0) {
+      await prisma.notification.createMany({ data: notifications });
+    }
+
     res.json({
-      message: `Tous les créneaux et réservations pour la date ${date} ont été supprimés.`,
+      message: `${reservations.length} réservations annulées pour la journée ${date}. Les utilisateurs concernés ont été notifiés.`,
     });
   } catch (err) {
-    console.error('Erreur lors de l\'annulation des créneaux et réservations :', err.message);
-    res.status(500).json({ error: 'Erreur lors de l\'annulation des créneaux et réservations.' });
+    console.error('Erreur lors de l\'annulation des créneaux, réservations et notifications :', err.message);
+    res.status(500).json({ error: 'Erreur lors de l\'annulation des créneaux, réservations et notifications.' });
   }
 });
+
 
 export default router;
