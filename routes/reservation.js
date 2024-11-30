@@ -92,12 +92,12 @@ router.delete('/cancel-day/:date', verify, async (req, res) => {
   const { date } = req.params;
 
   // Vérification du rôle d'administrateur
+  console.log('Rôle utilisateur :', req.user.role); // Vérifiez le rôle
   if (req.user.role !== 'ADMIN') {
     return res.status(403).json({ error: 'Accès refusé. Fonction réservée aux administrateurs.' });
   }
 
   try {
-    // Rechercher toutes les réservations pour la date spécifiée
     const reservations = await prisma.reservation.findMany({
       where: { date },
       include: { user: true },
@@ -107,7 +107,6 @@ router.delete('/cancel-day/:date', verify, async (req, res) => {
       return res.status(404).json({ error: 'Aucune réservation trouvée pour cette date.' });
     }
 
-    // Supprimer les réservations
     const reservationIds = reservations.map((r) => r.id);
     const slotIds = reservations.map((r) => r.slotId);
 
@@ -115,13 +114,11 @@ router.delete('/cancel-day/:date', verify, async (req, res) => {
       where: { id: { in: reservationIds } },
     });
 
-    // Réinitialiser les créneaux concernés
     await prisma.slot.updateMany({
       where: { id: { in: slotIds } },
       data: { reserved: false, userId: null },
     });
 
-    // Enregistrer une notification pour chaque utilisateur concerné
     const notifications = reservations.map((reservation) => ({
       userId: reservation.userId,
       message: `Votre cours de ${reservation.course} prévu le ${reservation.date} à ${reservation.heure} a été annulé.`,
