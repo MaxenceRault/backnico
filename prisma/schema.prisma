@@ -23,6 +23,7 @@ model User {
   reservations Reservation[] // Relation avec les réservations
   slots        Slot[]        // Relation avec les créneaux réservés par l'utilisateur
   role         Role          @default(USER) // Rôle par défaut "USER"
+  notifications Notification[] // Relation avec les notifications
 }
 
 // Modèle pour les réservations
@@ -67,4 +68,13 @@ model Response {
   createdAt DateTime @default(now())
   contactId Int      // Référence au message de contact
   contact   Contact  @relation(fields: [contactId], references: [id]) // Relation avec Contact
+}
+
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  message   String
+  createdAt DateTime @default(now())
 }
