@@ -1,82 +1,66 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import transporter from '../mailer.js';
-import verify from './verifyToken.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Envoyer une réponse à un contact
-router.post('/respond/:contactId', verify, async (req, res) => {
-  const { contactId } = req.params;
-  const { message } = req.body;
+// Envoyer un message de contact
+router.post('/', async (req, res) => {
+  const { nom, email, message } = req.body;
 
-  if (!message) {
-    return res.status(400).json({ error: 'Le message de réponse est requis.' });
+  // Log des données reçues
+  console.log('Données reçues:', { nom, email, message });
+
+  // Validation des champs
+  if (!nom || !email || !message) {
+    console.log('Validation échouée: Tous les champs sont requis');
+    return res.status(400).json({ error: 'Tous les champs sont requis' });
   }
 
   try {
-    // Récupérer les informations du contact
-    const contact = await prisma.contact.findUnique({
-      where: { id: parseInt(contactId, 10) },
+    // Enregistrer le message dans la base de données
+    await prisma.contact.create({
+      data: { nom, email, message },
     });
 
-    if (!contact) {
-      return res.status(404).json({ error: 'Contact introuvable.' });
-    }
-
-    // Créer une réponse dans la base de données
-    const response = await prisma.response.create({
-      data: {
-        message,
-        contactId: contact.id,
-      },
-    });
-
-    // Envoyer un email au contact
-    const mailOptions = {
+    // Configurer et envoyer l'email à l'administrateur
+    const adminMailOptions = {
       from: process.env.EMAIL_USER,
-      to: contact.email,
-      subject: `Réponse à votre message : ${contact.message}`,
-      text: `Bonjour ${contact.nom},\n\n${message}\n\nCordialement,\nL'équipe Support`,
+      to: process.env.EMAIL_RECEIVER, // L'adresse email de réception des messages de contact
+      subject: `Nouveau message de contact de ${nom}`,
+      text: `Nom: ${nom}\nEmail: ${email}\nMessage: ${message}`,
     };
 
-    transporter.sendMail(mailOptions, (err, info) => {
-      if (err) {
-        console.error('Erreur lors de l\'envoi de l\'email :', err);
-        return res.status(500).json({ error: 'Erreur lors de l\'envoi de l\'email.' });
+    transporter.sendMail(adminMailOptions, (error, info) => {
+      if (error) {
+        console.error('Erreur lors de l\'envoi de l\'email à l\'administrateur:', error);
+      } else {
+        console.log('Email envoyé à l\'administrateur:', info.response);
       }
-
-      console.log('Email envoyé :', info.response);
-      res.status(200).json({
-        message: 'Réponse envoyée avec succès.',
-        response,
-      });
-    });
-  } catch (err) {
-    console.error('Erreur lors de la réponse au contact :', err);
-    res.status(500).json({ error: 'Erreur lors de la réponse au contact.' });
-  }
-});
-
-// Récupérer tous les messages avec leurs réponses
-router.get('/all', verify, async (req, res) => {
-  try {
-    const contacts = await prisma.contact.findMany({
-      include: {
-        responses: true, // Inclure les réponses associées
-      },
-      orderBy: {
-        createdAt: 'desc', // Trier par date de création (plus récents en premier)
-      },
     });
 
-    res.status(200).json(contacts);
+    // Configurer et envoyer l'email de confirmation à l'utilisateur
+    const userMailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email, // L'adresse email fournie dans le formulaire
+      subject: 'Confirmation de réception de votre message',
+      text: `Bonjour ${nom},\n\nNous avons bien reçu votre message et nous vous répondrons très prochainement.\n\nCordialement,\nNicolas Lanternier`,
+    };
+
+    transporter.sendMail(userMailOptions, (error, info) => {
+      if (error) {
+        console.error('Erreur lors de l\'envoi de l\'email de confirmation:', error);
+        return res.status(500).json({ error: 'Erreur lors de l\'envoi de l\'email de confirmation' });
+      }
+      console.log('Email de confirmation envoyé à l\'utilisateur:', info.response);
+      res.json({ message: 'Message envoyé avec succès et email de confirmation envoyé' });
+    });
+
   } catch (err) {
-    console.error('Erreur lors de la récupération des contacts :', err);
-    res.status(500).json({ error: 'Erreur lors de la récupération des contacts.' });
+    console.error('Erreur lors de l\'envoi du message:', err);
+    res.status(500).json({ error: 'Erreur lors de l\'envoi du message' });
   }
 });
-
 
 export default router;
