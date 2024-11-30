@@ -7,14 +7,14 @@ import Joi from 'joi';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Schéma de validation des mises à jour
+// Schéma de validation des mises à jour de profil
 const updateSchema = Joi.object({
   nom: Joi.string().min(2).max(50).optional(),
   email: Joi.string().email().optional(),
   motDePasse: Joi.string().min(6).optional(),
 });
 
-// Route combinée pour le tableau de bord
+// Route combinée pour le tableau de bord utilisateur
 router.get('/dashboard', verify, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
@@ -67,16 +67,17 @@ router.get('/profile', verify, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
+      select: {
+        id: true,
+        nom: true,
+        email: true,
+        role: true,
+      },
     });
 
     if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé.' });
 
-    res.json({
-      id: user.id,
-      nom: user.nom,
-      email: user.email,
-      role: user.role,
-    });
+    res.json(user);
   } catch (err) {
     console.error('Erreur lors de la récupération du profil :', err);
     res.status(500).json({ error: 'Erreur lors de la récupération du profil.' });
@@ -106,10 +107,43 @@ router.put('/profile', verify, async (req, res) => {
       data,
     });
 
-    res.json(updatedUser);
+    res.json({
+      message: 'Profil mis à jour avec succès.',
+      user: updatedUser,
+    });
   } catch (err) {
     console.error('Erreur lors de la mise à jour du profil :', err);
     res.status(400).json({ error: 'Erreur lors de la mise à jour du profil.' });
+  }
+});
+
+// Récupérer les notifications utilisateur
+router.get('/notifications', verify, async (req, res) => {
+  try {
+    const notifications = await prisma.notification.findMany({
+      where: { userId: req.user.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(notifications);
+  } catch (err) {
+    console.error('Erreur lors de la récupération des notifications :', err.message);
+    res.status(500).json({ error: 'Erreur lors de la récupération des notifications.' });
+  }
+});
+
+// Marquer les notifications comme lues
+router.put('/notifications/read', verify, async (req, res) => {
+  try {
+    await prisma.notification.updateMany({
+      where: { userId: req.user.id },
+      data: { read: true },
+    });
+
+    res.json({ message: 'Toutes les notifications ont été marquées comme lues.' });
+  } catch (err) {
+    console.error('Erreur lors de la mise à jour des notifications :', err.message);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour des notifications.' });
   }
 });
 
