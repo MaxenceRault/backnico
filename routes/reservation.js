@@ -88,37 +88,52 @@ router.delete('/delete/:id', verify, async (req, res) => {
 });
 
 // Annuler toutes les réservations d'une journée (ADMIN)
+r// Annuler toutes les réservations d'une journée (ADMIN)
 router.delete('/cancel-day/:date', verify, async (req, res) => {
-  console.log('Rôle détecté dans la requête :', req.user.role); // Ajoutez ceci
+  const { date } = req.params;
 
+  // Vérification du rôle d'administrateur
   if (req.user.role !== 'ADMIN') {
     return res.status(403).json({ error: 'Accès refusé. Fonction réservée aux administrateurs.' });
   }
 
-  const { date } = req.params;
-
   try {
+    // Convertir la chaîne de caractères en objet Date
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate)) {
+      return res.status(400).json({ error: 'La date fournie est invalide.' });
+    }
+
+    // Rechercher toutes les réservations pour la date spécifiée
     const reservations = await prisma.reservation.findMany({
-      where: { date },
+      where: { date: parsedDate },
+      include: { user: true },
     });
 
     if (reservations.length === 0) {
       return res.status(404).json({ error: 'Aucune réservation trouvée pour cette date.' });
     }
 
+    // Supprimer les réservations
     const reservationIds = reservations.map((r) => r.id);
     const slotIds = reservations.map((r) => r.slotId);
 
-    await prisma.reservation.deleteMany({ where: { id: { in: reservationIds } } });
+    await prisma.reservation.deleteMany({
+      where: { id: { in: reservationIds } },
+    });
+
+    // Réinitialiser les créneaux concernés
     await prisma.slot.updateMany({
       where: { id: { in: slotIds } },
       data: { reserved: false, userId: null },
     });
 
-    res.json({ message: 'Toutes les réservations de la journée ont été annulées.' });
+    res.json({
+      message: `${reservations.length} réservations annulées pour la journée ${date}.`,
+    });
   } catch (err) {
     console.error('Erreur lors de l\'annulation des réservations :', err.message);
-    res.status(500).json({ error: 'Erreur serveur.' });
+    res.status(500).json({ error: 'Erreur lors de l\'annulation des réservations.' });
   }
 });
 
