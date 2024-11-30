@@ -107,33 +107,36 @@ router.delete('/cancel-day/:date', verify, async (req, res) => {
     // Rechercher toutes les réservations pour la date spécifiée
     const reservations = await prisma.reservation.findMany({
       where: { date: parsedDate },
-      include: { user: true },
+      include: { slot: true },
     });
-
-    if (reservations.length === 0) {
-      return res.status(404).json({ error: 'Aucune réservation trouvée pour cette date.' });
-    }
 
     // Supprimer les réservations
     const reservationIds = reservations.map((r) => r.id);
-    const slotIds = reservations.map((r) => r.slotId);
 
-    await prisma.reservation.deleteMany({
-      where: { id: { in: reservationIds } },
+    if (reservationIds.length > 0) {
+      await prisma.reservation.deleteMany({
+        where: { id: { in: reservationIds } },
+      });
+    }
+
+    // Supprimer les créneaux correspondants
+    const slotsToDelete = await prisma.slot.findMany({
+      where: { date: parsedDate },
     });
 
-    // Réinitialiser les créneaux concernés
-    await prisma.slot.updateMany({
-      where: { id: { in: slotIds } },
-      data: { reserved: false, userId: null },
-    });
+    if (slotsToDelete.length > 0) {
+      const slotIds = slotsToDelete.map((slot) => slot.id);
+      await prisma.slot.deleteMany({
+        where: { id: { in: slotIds } },
+      });
+    }
 
     res.json({
-      message: `${reservations.length} réservations annulées pour la journée ${date}.`,
+      message: `Tous les créneaux et réservations pour la date ${date} ont été supprimés.`,
     });
   } catch (err) {
-    console.error('Erreur lors de l\'annulation des réservations :', err.message);
-    res.status(500).json({ error: 'Erreur lors de l\'annulation des réservations.' });
+    console.error('Erreur lors de l\'annulation des créneaux et réservations :', err.message);
+    res.status(500).json({ error: 'Erreur lors de l\'annulation des créneaux et réservations.' });
   }
 });
 
