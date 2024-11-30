@@ -88,7 +88,7 @@ router.delete('/delete/:id', verify, async (req, res) => {
 });
 
 // Annuler toutes les réservations d'une journée (ADMIN)
-r// Annuler toutes les réservations d'une journée (ADMIN)
+// Annuler toutes les réservations d'une journée (ADMIN)
 router.delete('/cancel-day/:date', verify, async (req, res) => {
   const { date } = req.params;
 
