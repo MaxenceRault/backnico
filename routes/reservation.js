@@ -67,18 +67,35 @@ router.delete('/delete/:id', verify, async (req, res) => {
   try {
     const reservation = await prisma.reservation.findUnique({
       where: { id: reservationId },
+      include: { user: true }, // Inclure les détails de l'utilisateur pour la notification
     });
 
     if (!reservation || reservation.userId !== req.user.id) {
       return res.status(403).json({ error: 'Accès refusé.' });
     }
 
+    // Supprimer la réservation
     await prisma.reservation.delete({ where: { id: reservationId } });
 
+    // Réinitialiser le créneau
     await prisma.slot.update({
       where: { id: reservation.slotId },
       data: { reserved: false, userId: null },
     });
+
+    // Ajouter une notification pour tous les administrateurs
+    const admins = await prisma.user.findMany({
+      where: { role: 'ADMIN' },
+    });
+
+    const adminNotifications = admins.map((admin) => ({
+      userId: admin.id,
+      message: `La réservation du ${new Date(reservation.date).toLocaleDateString()} à ${reservation.heure} par ${reservation.user.nom} (${reservation.user.email}) a été annulée.`,
+    }));
+
+    if (adminNotifications.length > 0) {
+      await prisma.notification.createMany({ data: adminNotifications });
+    }
 
     res.json({ message: 'Réservation supprimée avec succès.' });
   } catch (err) {
@@ -86,7 +103,6 @@ router.delete('/delete/:id', verify, async (req, res) => {
     res.status(500).json({ error: 'Erreur lors de la suppression de la réservation.' });
   }
 });
-
 // Annuler toutes les réservations d'une journée (ADMIN)
 // Annuler toutes les réservations d'une journée (ADMIN)
 router.delete('/cancel-day/:date', verify, async (req, res) => {
