@@ -12,6 +12,9 @@ router.get('/user', verify, async (req, res) => {
       where: { userId: req.user.id },
       include: { slot: true },
     });
+    if (reservations.length === 0) {
+      return res.status(404).json({ error: 'Aucune réservation trouvée.' });
+    }
     res.json(reservations);
   } catch (err) {
     console.error('Erreur lors de la récupération des réservations :', err.message);
