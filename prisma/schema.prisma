@@ -76,5 +76,6 @@ model Notification {
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
   message   String
+  read      Boolean  @default(false) // Nouveau champ pour indiquer si la notification est lue
   createdAt DateTime @default(now())
 }

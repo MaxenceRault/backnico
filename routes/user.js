@@ -132,18 +132,18 @@ router.get('/notifications', verify, async (req, res) => {
   }
 });
 
-// Marquer les notifications comme lues
 router.put('/notifications/read', verify, async (req, res) => {
   try {
+    // Met à jour toutes les notifications pour cet utilisateur
     await prisma.notification.updateMany({
-      where: { userId: req.user.id },
+      where: { userId: req.user.id, read: false },
       data: { read: true },
     });
 
     res.json({ message: 'Toutes les notifications ont été marquées comme lues.' });
   } catch (err) {
     console.error('Erreur lors de la mise à jour des notifications :', err.message);
-    res.status(500).json({ error: 'Erreur lors de la mise à jour des notifications.' });
+    res.status(500).json({ error: 'Erreur serveur lors de la mise à jour des notifications.' });
   }
 });
 
