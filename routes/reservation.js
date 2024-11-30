@@ -23,6 +23,10 @@ router.get('/user', verify, async (req, res) => {
 router.post('/reserve', verify, async (req, res) => {
   const { slotId, course } = req.body;
 
+  if (!course) {
+    return res.status(400).json({ error: 'Le type de cours est requis.' });
+  }
+
   try {
     const slot = await prisma.slot.findUnique({ where: { id: slotId } });
 
@@ -32,10 +36,6 @@ router.post('/reserve', verify, async (req, res) => {
 
     if (slot.reserved) {
       return res.status(400).json({ error: 'Ce créneau est déjà réservé.' });
-    }
-
-    if (!course) {
-      return res.status(400).json({ error: 'Le type de cours est requis.' });
     }
 
     const reservation = await prisma.reservation.create({
@@ -89,13 +89,15 @@ router.delete('/delete/:id', verify, async (req, res) => {
 
 // Annuler toutes les réservations d'une journée (ADMIN)
 router.delete('/cancel-day/:date', verify, async (req, res) => {
+  const { date } = req.params;
+
+  // Vérification du rôle d'administrateur
   if (req.user.role !== 'ADMIN') {
     return res.status(403).json({ error: 'Accès refusé. Fonction réservée aux administrateurs.' });
   }
 
-  const date = req.params.date;
-
   try {
+    // Rechercher toutes les réservations pour la date spécifiée
     const reservations = await prisma.reservation.findMany({
       where: { date },
       include: { user: true },
@@ -105,29 +107,31 @@ router.delete('/cancel-day/:date', verify, async (req, res) => {
       return res.status(404).json({ error: 'Aucune réservation trouvée pour cette date.' });
     }
 
+    // Supprimer les réservations
     const reservationIds = reservations.map((r) => r.id);
     const slotIds = reservations.map((r) => r.slotId);
 
-    // Supprimer les réservations
     await prisma.reservation.deleteMany({
       where: { id: { in: reservationIds } },
     });
 
-    // Mettre à jour les créneaux pour les rendre disponibles
+    // Réinitialiser les créneaux concernés
     await prisma.slot.updateMany({
       where: { id: { in: slotIds } },
       data: { reserved: false, userId: null },
     });
 
-    // Enregistrer les notifications pour chaque utilisateur concerné
-    const notifications = reservations.map((r) => ({
-      userId: r.userId,
-      message: `Votre cours de ${r.course} le ${r.date} à ${r.heure} a été annulé.`,
+    // Enregistrer une notification pour chaque utilisateur concerné
+    const notifications = reservations.map((reservation) => ({
+      userId: reservation.userId,
+      message: `Votre cours de ${reservation.course} prévu le ${reservation.date} à ${reservation.heure} a été annulé.`,
     }));
 
     await prisma.notification.createMany({ data: notifications });
 
-    res.json({ message: 'Toutes les réservations de la journée ont été annulées.' });
+    res.json({
+      message: `${reservations.length} réservations annulées pour la journée ${date}.`,
+    });
   } catch (err) {
     console.error('Erreur lors de l\'annulation des réservations :', err.message);
     res.status(500).json({ error: 'Erreur lors de l\'annulation des réservations.' });
