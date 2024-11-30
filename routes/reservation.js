@@ -126,10 +126,6 @@ router.delete('/cancel-day/:date', verify, async (req, res) => {
       include: { user: true },
     });
 
-    if (reservations.length === 0) {
-      return res.status(404).json({ error: 'Aucune réservation trouvée pour cette date.' });
-    }
-
     // Supprimer les réservations
     const reservationIds = reservations.map((r) => r.id);
     if (reservationIds.length > 0) {
@@ -138,7 +134,7 @@ router.delete('/cancel-day/:date', verify, async (req, res) => {
       });
     }
 
-    // Supprimer les créneaux correspondants
+    // Rechercher et supprimer les créneaux (slots) pour la date spécifiée
     const slotsToDelete = await prisma.slot.findMany({
       where: { date: parsedDate },
     });
@@ -150,18 +146,18 @@ router.delete('/cancel-day/:date', verify, async (req, res) => {
       });
     }
 
-    // Ajouter des notifications pour les utilisateurs concernés
-    const notifications = reservations.map((reservation) => ({
-      userId: reservation.userId,
-      message: `Votre cours de ${reservation.course} prévu le ${reservation.date.toLocaleDateString()} à ${reservation.heure} a été annulé.`,
-    }));
+    // Ajouter des notifications pour les utilisateurs concernés, si des réservations existaient
+    if (reservations.length > 0) {
+      const notifications = reservations.map((reservation) => ({
+        userId: reservation.userId,
+        message: `Votre cours de ${reservation.course} prévu le ${reservation.date.toLocaleDateString()} à ${reservation.heure} a été annulé.`,
+      }));
 
-    if (notifications.length > 0) {
       await prisma.notification.createMany({ data: notifications });
     }
 
     res.json({
-      message: `${reservations.length} réservations annulées pour la journée ${date}. Les utilisateurs concernés ont été notifiés.`,
+      message: `Annulation de la journée ${date} effectuée. ${reservations.length} réservations supprimées et ${slotsToDelete.length} créneaux supprimés.`,
     });
   } catch (err) {
     console.error('Erreur lors de l\'annulation des créneaux, réservations et notifications :', err.message);
