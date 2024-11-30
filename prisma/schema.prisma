@@ -39,11 +39,12 @@ model Reservation {
 
 // Modèle pour les contacts
 model Contact {
-  id        Int      @id @default(autoincrement()) // ID unique auto-incrémenté
-  nom       String   // Nom du contact
-  email     String   // Email du contact
-  message   String   // Message envoyé par le contact
-  createdAt DateTime @default(now()) // Date de création
+  id        Int        @id @default(autoincrement()) // ID unique auto-incrémenté
+  nom       String     // Nom du contact
+  email     String     // Email du contact
+  message   String     // Message envoyé par le contact
+  createdAt DateTime   @default(now()) // Date de création
+  responses Response[] // Liste des réponses associées (relation inverse)
 }
 
 // Modèle pour les créneaux (slots)
@@ -57,4 +58,13 @@ model Slot {
   reservations Reservation[] // Relation inverse avec les réservations
 
   @@unique([date, heure]) // Empêche les doublons pour les créneaux
+}
+
+
+model Response {
+  id        Int      @id @default(autoincrement())
+  message   String   // Message envoyé par l'administrateur
+  createdAt DateTime @default(now())
+  contactId Int      // Référence au message de contact
+  contact   Contact  @relation(fields: [contactId], references: [id]) // Relation avec Contact
 }
