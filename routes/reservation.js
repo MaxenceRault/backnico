@@ -92,12 +92,12 @@ router.delete('/cancel-day/:date', verify, async (req, res) => {
   const { date } = req.params;
 
   // Vérification du rôle d'administrateur
-  console.log('Rôle utilisateur :', req.user.role);
-  if (req.user.role !== 'ADMIN') {
+  if (!req.user || req.user.role !== 'ADMIN') {
     return res.status(403).json({ error: 'Accès refusé. Fonction réservée aux administrateurs.' });
   }
 
   try {
+    // Rechercher toutes les réservations pour la date spécifiée
     const reservations = await prisma.reservation.findMany({
       where: { date },
     });
@@ -106,10 +106,10 @@ router.delete('/cancel-day/:date', verify, async (req, res) => {
       return res.status(404).json({ error: 'Aucune réservation trouvée pour cette date.' });
     }
 
+    // Supprimer les réservations
     const reservationIds = reservations.map((r) => r.id);
     const slotIds = reservations.map((r) => r.slotId);
 
-    // Supprimer les réservations
     await prisma.reservation.deleteMany({
       where: { id: { in: reservationIds } },
     });
